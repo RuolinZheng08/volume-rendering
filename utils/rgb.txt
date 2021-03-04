@@ -1,0 +1,13 @@
+#space:=rgb
+# Format is just one line per light, with 7 values, meaning:
+#   col0 col1 col2  dir0 dir1 dir2  vsp
+# where the color coordinates are in the space identified by the first
+# "space:=" line (rgb or hsv), and the the light direction coordinates
+# (where the light seems to come from this direction) are in view-space
+# if "vsp" is non-zero, otherwise in world-space.  Directions
+# don't have to be normalized; that's handled by rndCtxLightUpdate
+#
+# Three lights, red, green, and blue, from X, Y, and Z
+1 0 0   1 0 0  0
+0 1 0   0 1 0  0
+0 0 1   0 0 1  0

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+##
+## rnd and rendr: SciVis-2021 Project 3
+## Copyright (C)  2021 University of Chicago. All rights reserved.
+
+# a little script to run (actually, to turn into, via exec) the right
+# reference executable, rrendr-osx or rrendr-linux, depending on
+# current platform
+
+# https://stackoverflow.com/questions/59895/getting-the-source-directory-of-a-bash-script-from-within
+here="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+if [[ $(uname -s) == "Darwin" ]]; then
+    cmd="rrendr-osx"
+else
+    cmd="rrendr-linux"
+fi
+
+exec $here/$cmd "$@"
