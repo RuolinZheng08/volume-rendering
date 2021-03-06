@@ -6,7 +6,7 @@ class Camera():
         self.near_clip = near_clip
         self.far_clip = far_clip
         self.field_of_view = field_of_view
-        self.img_plane_size = img_plane_size
+        self.img_plane_size = img_plane_size # 2-tuple
         self.aspect_ratio = aspect_ratio
         self.ortho = ortho
 

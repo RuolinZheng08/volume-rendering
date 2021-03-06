@@ -9,7 +9,7 @@ class Convolution():
 
     def evaluate(x_world, y_world, z_world, context):
         size_x, size_y, size_z = context.volume.data.shape
-        pos_world = np.array([[x_world, y_world, z_world, 1]])
+        pos_world = np.array([x_world, y_world, z_world, 1]]).T # column vec
         self.pos_index = context.WtoI @ pos_world
         x_index, y_index, z_index = self.pos_index.squeeze().tolist()
         # cache intermediate computation
