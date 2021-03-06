@@ -3,6 +3,7 @@ import sys
 sys.path.append('python-packages') # pip installed modules
 
 import numpy as np
+import nrrd
 from tqdm import tqdm
 
 # my modules

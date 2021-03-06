@@ -72,7 +72,7 @@ class Ray():
         # manually set last entry to 1 for matrix multiplication
         pos_view[3] = 1
         pos_world = camera.VtoW @ pos_view
-        convolution.evaluate(pos_world[0], pos_world[1], pos_world[2], context)
+        convolution.evaluate(pos_world[0, 0], pos_world[1, 0], pos_world[2, 0], context)
         if not convolution.inside:
             return keepgoing # skip this sample, proceed to the next
 
