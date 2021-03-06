@@ -41,6 +41,12 @@ class Ray():
         # convert view-space initial position to world-space
         self.pos_world_init = camera.VtoW @ self.pos_view_init
 
+    def go(self, idx_horizontal, idx_vertical, convolution, context):
+        keepgoing = True
+        while keepgoing:
+            keepgoing = self.step(convolution, context)
+        return self.result
+
     def step(self, convolution, context):
         """
         rndProbeRgbaLit
