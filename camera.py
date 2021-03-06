@@ -1,5 +1,8 @@
 class Camera():
     def __init__(self, fr, at, up, near_clip, far_clip, field_of_view, img_plane_size, aspect_ratio, ortho):
+        """
+        field_of_view: degrees
+        """
         self.fr = fr
         self.at = at
         self.up = up
@@ -30,7 +33,8 @@ class Camera():
         self.near_clip_view = self.near_clip + self.dist
         self.far_clip_view = self.far_clip + self.dist
         # height and width of the image plane, different from sizes
-        # hght = 2d tan(FOV / 2)
-        self.img_plane_height = 2 * self.d * np.tan(self.field_of_view / 2)
+        # hght = 2d tan(FOV / 2), FOV must be in radians
+        radians = np.radians(self.field_of_view)
+        self.img_plane_height = 2 * self.d * np.tan(radians / 2)
         # wdth = ar hght
         self.img_plane_width = self.aspect_ratio * self.img_plane_height

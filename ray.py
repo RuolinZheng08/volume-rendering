@@ -1,15 +1,13 @@
 from utils import unlerp, lerp, quantize
 
 class Ray():
-    def __init__(self, idx_horizontal, idx_vertical, convolution, context):
+    def start(self, idx_horizontal, idx_vertical, convolution, context):
         """
         rndRayStart
-        idx_horizontal, idx_vertical: pixel location in the output image
         """
-        self.idx_horizontal = idx_horizontal
-        self.idx_vertical = idx_vertical
         self.sample_idx = 0 # k-th sample along this ray
-        self.step = None
+        self.step_view = None
+        self.step_view_len = None
 
         self.pos_view_init = None
         self.pos_world_init = None
@@ -24,24 +22,26 @@ class Ray():
         camera = context.camera
         ray_img = np.empty((1, 3))
         ray_img[0, 0] = (camera.img_plane_width / 2) * \
-        lerp(-1, 1, -0.5, camera.img_plane_size[0] - 0.5)
+        lerp(-1, 1, -0.5, idx_horizontal, camera.img_plane_size[0] - 0.5)
         ray_img[0, 1] = (camera.img_plane_height / 2) * \
-        lerp(1, -1, -0.5, camera.img_plane_size[1] - 0.5)
+        lerp(1, -1, -0.5, idx_vertical, camera.img_plane_size[1] - 0.5)
         ray_img[0, 2] = -camera.dist
 
         if camera.ortho:
             self.pos_view_init = np.array(
                 [[ray_img[0, 0], ray_img[0, 1], -camera.near_clip_view]]).T
-            self.step = np.array([[0, 0, -context.plane_sep]]).T
+            self.step_view = np.array([[0, 0, -context.plane_sep]]).T
         else: # perspective
             scale = camera.near_clip_view / camera.dist
             self.pos_view_init = scale * ray_img
             scale = context.plane_sep / camera.dist
-            self.step = scale * ray_img
+            self.step_view = scale * ray_img
+        self.step_view_len = np.linalg.norm(self.step_view)
         # convert view-space initial position to world-space
         self.pos_world_init = camera.VtoW @ self.pos_view_init
 
     def go(self, idx_horizontal, idx_vertical, convolution, context):
+        self.start(idx_horizontal, idx_vertical, convolution, context)
         keepgoing = True
         while keepgoing:
             keepgoing = self.step(convolution, context)
@@ -55,7 +55,7 @@ class Ray():
         """
         keepgoing = True
         camera = context.camera
-        pos_view = self.pos_view_init + self.sample_idx * self.step
+        pos_view = self.pos_view_init + self.sample_idx * self.step_view
         # stop when -p_n > fcv
         if -pos_view[0, 2] > camera.far_clip_view:
             return False # no need to keep going
@@ -78,8 +78,7 @@ class Ray():
         clamped = np.clip(rgba[3], 0, 1)
         # opacity correction
         # corrected = 1 - ((1 - clamped) ^ (delta / unit_step))
-        delta = np.linalg.norm(self.step)
-        corrected = 1 - pow((1 - clamped), delta / transfer_func.unit_step)
+        corrected = 1 - pow((1 - clamped), self.step_view_len / transfer_func.unit_step)
         rgba[3] = np.clip(corrected, 0, 1)
 
         # no need to do Blinn-Phong if corrected opacity is 0

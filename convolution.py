@@ -1,8 +1,10 @@
 import numpy as np
 
 class Convolution():
-    def __init__(self, needgrad):
-        self.needgrad = needgrad
+    def __init__(self):
+        """
+        needgrad always true b/c rndProbeRgbaLit
+        """
         self.inside = True # set to False if convo cannot be evaluated
         self.value = None
         self.gradient = None # world-space gradients
@@ -16,12 +18,13 @@ class Convolution():
         idx_start = context.idx_start
         idx_end = context.idx_end
         cache_length = idx_end - idx_start + 1
-        kernel = context.kernel
+
         kern_cache_x = np.empty(cache_length)
         kern_cache_y = np.empty(cache_length)
-        if self.needgrad:
-            kern_deriv_cache_x = np.empty(cache_length)
-            kern_deriv_cache_y = np.empty(cache_length)
+        kern_deriv_cache_x = np.empty(cache_length)
+        kern_deriv_cache_y = np.empty(cache_length)
+
+        kernel = context.kernel
 
         # compute convolution
         if kernel.support & 1: # odd support
@@ -50,8 +53,7 @@ class Convolution():
                 break
             # compute convo result for current z
             kern_res_z = kernel.evaluate(zalpha - zi)
-            if self.needgrad:
-                kern_deriv_res_z = kernel.evaluate_derivative(zalpha - zi)
+            kern_deriv_res_z = kernel.evaluate_derivative(zalpha - zi)
 
             # inner loop, faster axis
             for yi in range(idx_start, idx_end + 1):
@@ -61,12 +63,10 @@ class Convolution():
                     break
                 if zi == idx_start: # first iter, compute cache
                     kern_cache_y[yi - idx_start] = kernel.evaluate(yalpha - yi)
+                    kern_deriv_cache_y[yi - idx_start] = \
+                    kernel.evaluate_derivative(yalpha - yi)
                 kern_res_y = kern_cache_y[yi - idx_start]
-                if self.needgrad:
-                    if zi == idx_start:
-                        kern_deriv_cache_y[yi - idx_start] = \
-                        kernel.evaluate_derivative(yalpha - yi)
-                    kern_deriv_res_y = kern_derive_cache_y[yi - idx_start]
+                kern_deriv_res_y = kern_derive_cache_y[yi - idx_start]
 
                 # innermost loop, fastest axis
                 for xi in range(idx_start, idx_end + 1):
@@ -77,29 +77,25 @@ class Convolution():
                     # first iter, compute cache
                     if zi == idx_start and yi == idx_start:
                         kern_cache_x[xi - idx_start] = kernel.evaluate(xalpha - xi)
+                        kern_deriv_cache_x[xi - idx_start] = \
+                        kernel.evaluate_derivative(xalpha - xi)
                     kern_res_x = kern_cache_x[xi - idx_start]
+                    kern_deriv_res_x = kern_deriv_cache_x[xi - idx_start]
+
+                    val = context.volume[vol_idx_x, vol_idx_y, vol_idx_z]
                     # accumulate convo result
-                    convo_result += \
-                    context.volume[vol_idx_x, vol_idx_y, vol_idx_z] * \
-                    kern_res_x * kern_res_y * kern_res_z
+                    convo_result += val * kern_res_x * kern_res_y * kern_res_z
                     # accumulate gradients
-                    if self.needgrad:
-                        if zi == idx_start and yi == idx_start:
-                            kern_deriv_cache_x[xi - idx_start] = \
-                            kernel.evaluate_derivative(xalpha - xi)
-                        kern_deriv_res_x = kern_deriv_cache_x[xi - idx_start]
-                        val = context.volume[vol_idx_x, vol_idx_y, vol_idx_z]
-                        gradient_index[0, 0] += val * \
-                        kern_deriv_res_x * kern_res_y * kern_res_z
-                        gradient_index[0, 1] += val * \
-                        kern_res_x * kern_deriv_res_y * kern_res_z
-                        gradient_index[0, 2] += val * \
-                        kern_res_x * kern_res_y * kern_deriv_res_z
+                    gradient_index[0, 0] += val * \
+                    kern_deriv_res_x * kern_res_y * kern_res_z
+                    gradient_index[0, 1] += val * \
+                    kern_res_x * kern_deriv_res_y * kern_res_z
+                    gradient_index[0, 2] += val * \
+                    kern_res_x * kern_res_y * kern_deriv_res_z
                     # end innermost loop
                 # end inner loop
             # end outer loop
         if self.inside: # convo is valid
             self.value = convo_result
-            if self.needgrad:
-                self.gradient = context.gradient_ItoW @ gradient_index
+            self.gradient = context.gradient_ItoW @ gradient_index
         # no return value
