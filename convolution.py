@@ -9,11 +9,12 @@ class Convolution():
         self.value = None
         self.gradient = None # world-space gradients
 
-    def evaluate(x_world, y_world, z_world, context):
+    def evaluate(self, x_world, y_world, z_world, context):
         size_x, size_y, size_z = context.volume.data.shape
-        pos_world = np.array([x_world, y_world, z_world, 1]]).T # column vec
+        pos_world = np.array([[x_world, y_world, z_world, 1]]).T # column vec
         self.pos_index = context.WtoI @ pos_world
-        x_index, y_index, z_index = self.pos_index.squeeze().tolist()
+        # the last entry of the len-4 vec is unused
+        x_index, y_index, z_index, _ = self.pos_index.squeeze()
         # cache intermediate computation
         idx_start = context.idx_start
         idx_end = context.idx_end
@@ -41,7 +42,7 @@ class Convolution():
 
         convo_result = 0 # assign to self.value if convo is valid
         # column vector to accumulate gradient during convo
-        gradient_index = np.zeros((1, 3))
+        gradient_index = np.zeros((3, 1))
 
         # the main convo loop
         # index into context.volume[vol_idx_x, vol_idx_y, vol_idx_z]
@@ -86,11 +87,11 @@ class Convolution():
                     # accumulate convo result
                     convo_result += val * kern_res_x * kern_res_y * kern_res_z
                     # accumulate gradients
-                    gradient_index[0, 0] += val * \
+                    gradient_index[0] += val * \
                     kern_deriv_res_x * kern_res_y * kern_res_z
-                    gradient_index[0, 1] += val * \
+                    gradient_index[1] += val * \
                     kern_res_x * kern_deriv_res_y * kern_res_z
-                    gradient_index[0, 2] += val * \
+                    gradient_index[2] += val * \
                     kern_res_x * kern_res_y * kern_deriv_res_z
                     # end innermost loop
                 # end inner loop

@@ -1,5 +1,7 @@
+import numpy as np
+
 class Camera():
-    def __init__(self, fr, at, up, near_clip, far_clip, field_of_view, img_plane_size, aspect_ratio, ortho):
+    def __init__(self, fr, at, up, near_clip, far_clip, field_of_view, img_plane_size, ortho):
         """
         field_of_view: degrees
         """
@@ -10,9 +12,9 @@ class Camera():
         self.far_clip = far_clip
         self.field_of_view = field_of_view
         self.img_plane_size = img_plane_size # 2-tuple
-        self.aspect_ratio = aspect_ratio
         self.ortho = ortho
 
+        self.aspect_ratio = img_plane_size[0] / img_plane_size[1]
         # do the computations like in rndCameraUpdate
         fr_minus_at = fr - at
         # d = |fr - at|
@@ -20,10 +22,10 @@ class Camera():
         # n = (fr - at) / |fr - at|
         self.n = fr_minus_at / self.dist
         # u = up x n / |up x n|
-        up_cross_n = np.cross(up, self.n)
-        self.u = up_cross_n / np.linalg.norm(up_cross_n)
+        up_cross_n = np.cross(up.squeeze(), self.n.squeeze())
+        self.u = up_cross_n[:, np.newaxis] / np.linalg.norm(up_cross_n)
         # v = n x u
-        self.v = np.cross(self.n, self.u)
+        self.v = np.cross(self.n.squeeze(), self.u.squeeze())[:, np.newaxis]
         # assemble view-to-world matrix
         mat = np.hstack([
             self.u, self.v, self.n, self.fr
@@ -35,6 +37,6 @@ class Camera():
         # height and width of the image plane, different from sizes
         # hght = 2d tan(FOV / 2), FOV must be in radians
         radians = np.radians(self.field_of_view)
-        self.img_plane_height = 2 * self.d * np.tan(radians / 2)
+        self.img_plane_height = 2 * self.dist * np.tan(radians / 2)
         # wdth = ar hght
         self.img_plane_width = self.aspect_ratio * self.img_plane_height

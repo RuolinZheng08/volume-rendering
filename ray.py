@@ -1,3 +1,6 @@
+import numpy as np
+
+# my modules
 from utils import unlerp, lerp, quantize
 
 class Ray():
@@ -6,13 +9,14 @@ class Ray():
         rndRayStart
         """
         self.sample_idx = 0 # k-th sample along this ray
-        self.step_view = None
         self.step_view_len = None
-
+        # len-4 vectors, with last entry either np.nan by default
+        # or manually set to 1 for view-to-world matrix multiplication
+        self.step_view = None
         self.pos_view_init = None
         self.pos_world_init = None
 
-        self.result = np.full(context.outside_val, 4)
+        self.result = np.full(4, context.outside_val) # 4 for RGBA
         self.result_cache = None
         self.result_curr = None
 
@@ -20,23 +24,27 @@ class Ray():
         self.transparency = None
 
         camera = context.camera
-        ray_img = np.empty((1, 3))
-        ray_img[0, 0] = (camera.img_plane_width / 2) * \
+        ray_img = np.empty((4, 1))
+        ray_img[0] = (camera.img_plane_width / 2) * \
         lerp(-1, 1, -0.5, idx_horizontal, camera.img_plane_size[0] - 0.5)
-        ray_img[0, 1] = (camera.img_plane_height / 2) * \
+        ray_img[1] = (camera.img_plane_height / 2) * \
         lerp(1, -1, -0.5, idx_vertical, camera.img_plane_size[1] - 0.5)
-        ray_img[0, 2] = -camera.dist
+        ray_img[2] = -camera.dist
+        ray_img[3] = np.nan
 
         if camera.ortho:
-            self.pos_view_init = np.array(
-                [[ray_img[0, 0], ray_img[0, 1], -camera.near_clip_view]]).T
-            self.step_view = np.array([[0, 0, -context.plane_sep]]).T
+            self.pos_view_init = np.array([[ray_img[0, 0], ray_img[0, 1],
+            -camera.near_clip_view, np.nan]]).T
+            self.step_view = np.array([[0, 0, -context.plane_sep, np.nan]]).T
         else: # perspective
             scale = camera.near_clip_view / camera.dist
             self.pos_view_init = scale * ray_img
             scale = context.plane_sep / camera.dist
             self.step_view = scale * ray_img
         self.step_view_len = np.linalg.norm(self.step_view)
+
+        # manually set last entry to 1
+        self.pos_view_init[3] = 1
         # convert view-space initial position to world-space
         self.pos_world_init = camera.VtoW @ self.pos_view_init
 
@@ -57,12 +65,14 @@ class Ray():
         camera = context.camera
         pos_view = self.pos_view_init + self.sample_idx * self.step_view
         # stop when -p_n > fcv
-        if -pos_view[0, 2] > camera.far_clip_view:
+        if -pos_view[2] > camera.far_clip_view:
             return False # no need to keep going
         self.sample_idx += 1
 
+        # manually set last entry to 1 for matrix multiplication
+        pos_view[3] = 1
         pos_world = camera.VtoW @ pos_view
-        convolution.evaluate(pos_world[0, 0], pos_world[0, 1], pos_world[0, 2], context)
+        convolution.evaluate(pos_world[0], pos_world[1], pos_world[2], context)
         if not convolution.inside:
             return keepgoing # skip this sample, proceed to the next
 
@@ -143,7 +153,7 @@ class Ray():
         light = context.light
         params_light = context.params_light
         rgb_out = params_light.k_ambient * rgb_in
-        if light.num == 0 or
+        if light.num == 0 or \
         (params_light.k_ambient == 0 and params_light.k_specular == 0):
             return rgb_out # done
         gradient_len = np.linalg.norm(gradient)
@@ -153,10 +163,11 @@ class Ray():
         # surface normal N = -g/|g|
         normal = -gradient / gradient_len
         for i in range(light.num):
+            light_col = light.rgb[i]
+            light_dir = light.xyz[i]
             # compute diffuse
             # component-wise c_M * c_L
             prod = rgb_in * light.rgb[i]
-            light_dir = light.xyz[i]
             scale = max(0, np.dot(normal, light_dir))
             diffuse = params_light.k_diffuse * scale * prod
 
@@ -165,7 +176,7 @@ class Ray():
             halfway = (viewer_dir + light_dir)
             halfway /= np.linalg.norm(halfway) # normalize
             scale = pow(max(0, np.dot(normal, halfway), params_light.p_shininess))
-            specular = params_light.k_specular *
+            specular = params_light.k_specular * scale * light_col
 
             rgb_out += diffuse + specular
 

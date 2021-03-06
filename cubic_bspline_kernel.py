@@ -25,4 +25,7 @@ class CubicBsplineKernel():
         elif x < 2:
             x -= 1
             ret = -1 / 2 + x * (1 - x / 2)
-        return (xx < 0) ? -ret : ret
+        if xx < 0:
+            return -ret
+        else:
+            return ret

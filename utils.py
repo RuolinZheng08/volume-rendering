@@ -1,9 +1,12 @@
+import re
 from types import SimpleNamespace
 
 import numpy as np
 import nrrd
 
+# my modules
 from cubic_bspline_kernel import CubicBsplineKernel
+from camera import Camera
 
 def unlerp(imin, xx, imax):
     """
@@ -30,9 +33,11 @@ def quantize(vmin, val, vmax, num):
     elif val >= vmax:
         return num - 1
     step = (vmax - vmin) / num
-    ret = np.floor((val - vmin) / step)
-    # make sure ret is below num
-    return (ret == num) ? ret - 1 : ret
+    idx = np.floor((val - vmin) / step)
+    # make sure quantized idx is below num
+    if idx == num:
+        idx -= 1
+    return idx
 
 def construct_context(params_dict):
     """
@@ -59,15 +64,21 @@ def construct_context(params_dict):
 
     support = context.kernel.support
     if support & 1: # odd support
-        context.idx_start = (1 - support) / 2
-        context.idx_end = (support - 1) / 2
+        idx_start = (1 - support) / 2
+        idx_end = (support - 1) / 2
     else:
-        context.idx_start = 1 - support / 2
-        context.idx_end = support / 2
-    context.WtoI = np.linalg.inv(ctx.volume.ItoW)
+        idx_start = 1 - support / 2
+        idx_end = support / 2
+    # coerce to integers
+    context.idx_start = int(idx_start)
+    context.idx_end = int(idx_end)
+
+    context.WtoI = np.linalg.inv(context.volume.ItoW)
     # take upper 3x3 block of 4x4 matrix, take inverse then transpose
     mat = context.volume.ItoW[:3, :3]
     context.gradient_ItoW = np.linalg.inv(mat).T
+
+    return context
 
 def load_volume(fpath_volume):
     data, header = nrrd.read(fpath_volume)
@@ -80,7 +91,7 @@ def load_transfer_func(fpath_lut):
     data, header = nrrd.read(fpath_lut)
     vmin = header['axis mins'][1]
     vmax = header['axis maxs'][1]
-    transfer_func = SimpleNamespace(rgba=rgba, vmin=vmin, vmax=vmax, len=rgba.shape[1])
+    transfer_func = SimpleNamespace(rgba=data, vmin=vmin, vmax=vmax, len=data.shape[1])
     return transfer_func
 
 def load_light(fpath_light):
@@ -92,10 +103,11 @@ def load_light(fpath_light):
     xyz = []
     with open(fpath_light, 'rt') as f:
         for line in f:
-            if not line.startswith('#'): # not a comment
-                color, direction, is_view_space = e.split( r'\s{2,}', line.strip())
-                rgb.append([float(s) for s in color.split()])
-                xyz.append([float(s) for s in direction.split()])
+            if line.startswith('#'): # is a comment
+                continue
+            color, direction, is_view_space = re.split(r'\s{2,}', line.strip())
+            rgb.append([float(s) for s in color.split()])
+            xyz.append([float(s) for s in direction.split()])
     light.rgb = np.hstack(rgb)
     light.xyz = np.hstack(xyz)
     light.num = len(rgb)

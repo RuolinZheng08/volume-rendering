@@ -2,10 +2,7 @@
 import sys
 sys.path.append('python-packages') # pip installed modules
 
-from collections import defaultdict
-
 import numpy as np
-import nrrd
 from tqdm import tqdm
 
 # my modules
@@ -32,9 +29,9 @@ def main():
     nrrd.write(fpath_out, img_out)
 
 def parse_args(args):
-    params_dict = defaultdict()
+    params_dict = {}
     # params for setting up the camera
-    params_dict['params_camera'] = defaultdict()
+    params_dict['params_camera'] = {}
     params_dict['params_camera']['fr'] = np.array([[6, 12, 5]]).T
     params_dict['params_camera']['at'] = np.array([[0, 0, 0]]).T
     params_dict['params_camera']['up'] = np.array([[0, 0, 1]]).T
@@ -42,14 +39,18 @@ def parse_args(args):
     params_dict['params_camera']['far_clip'] = 2.3
     params_dict['params_camera']['field_of_view'] = 20
     params_dict['params_camera']['img_plane_size'] = (320, 280)
+    params_dict['params_camera']['ortho'] = False
 
     params_dict['unit_step'] = 0.03
     params_dict['plane_sep'] = 0.03
+    params_dict['num_threads'] = 0
+    params_dict['outside_val'] = np.nan
+    params_dict['alpha_near_one'] = 1
 
     # file paths
     params_dict['fpath_volume'] = 'utils/cube.nrrd'
     params_dict['fpath_lut'] = 'utils/lut.nrrd'
-    params_dict['fpath_lit'] = 'utils/rgb.txt'
+    params_dict['fpath_light'] = 'utils/rgb.txt'
     params_dict['fpath_out'] = 'utils/cube-rgb-py.nrrd'
 
     return params_dict
