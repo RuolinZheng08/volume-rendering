@@ -21,14 +21,16 @@ from ray import Ray
 # globals
 global_context = None
 global_img_out = None
+global_pbar = None
 global_row, global_col = 0, 0
 global_mutex = threading.Lock()
 
 def main():
     params_dict = parse_args() # using argparse.ArgumentParser
 
-    # context could be shared among threads using nonlocal
-    global global_context, global_img_out
+    # initialize those shared among threads
+    global global_context, global_img_out, global_pbar
+
     global_context = construct_context(params_dict)
     num_rows, num_cols = global_context.camera.img_plane_size
     global_img_out = np.empty((4, num_rows, num_cols)) # 4 for RGBA
@@ -43,6 +45,7 @@ def main():
 
     else: # multithread, 1 only incurs locking overhead
         num_threads = global_context.num_threads
+        global_pbar = tqdm(total=num_rows * num_cols) # total num of pixels
         thread_args = []
         for tid in range(num_threads):
             targ = SimpleNamespace()
@@ -53,20 +56,23 @@ def main():
             thread_args.append(targ)
 
         with ThreadPoolExecutor(max_workers=num_threads) as executor:
-            executor.map(thread_function, thread_args)
+            executor.map(thread_func, thread_args)
+
+        global_pbar.close()
 
     fpath_out = params_dict['fpath_out']
     # TODO: write headers as well
     nrrd.write(fpath_out, global_img_out)
 
 def thread_func(args):
-    global global_context, global_img_out
-    num_rows, num_cols = context.camera.img_plane_size
+    global global_context, global_img_out, global_pbar, global_mutex
+    global global_row, global_col
+    num_rows, num_cols = global_context.camera.img_plane_size
     while True:
         # lock
-        global global_mutex
         with global_mutex:
-            global global_row, global_col
+            # XXX: may incur overhead when updating progress bar
+            global_pbar.update(1)
             # cache values locally
             row = global_row
             col = global_col
@@ -79,7 +85,7 @@ def thread_func(args):
         # unlock
         if col == num_cols:
             break # done
-        result = args.ray.go(row, col, args.convolution, context)
+        result = args.ray.go(row, col, args.convolution, global_context)
         global_img_out[:, row, col] = result
 
 def parse_args():
