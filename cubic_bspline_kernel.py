@@ -22,8 +22,9 @@ class CubicBsplineKernel():
         ret = np.zeros(xs.shape)
         x = np.fabs(xs)
         ret = np.where(x < 1, 2 / 3 + x * x * (-1 + x / 2), ret)
+        x_minus_one = x - 1
         ret = np.where((x >= 1) & (x < 2),
-        1 / 6 + x * (-1 / 2 + x * (1 / 2 - x / 6)), ret)
+        1 / 6 + x_minus_one * (-1 / 2 + x_minus_one * (1 / 2 - x_minus_one / 6)), ret)
         return ret
 
     def evaluate_derivative(self, xx):
@@ -46,7 +47,8 @@ class CubicBsplineKernel():
         ret = np.zeros(xs.shape)
         x = np.fabs(xs)
         ret = np.where(x < 1, x * (-2 + x * (3 / 2)), ret)
+        x_minus_one = x - 1
         ret = np.where((x >= 1) & (x < 2),
-        -1 / 2 + (x - 1) * (1 - (x - 1) / 2), ret)
+        -1 / 2 + x_minus_one * (1 - x_minus_one / 2), ret)
         ret = np.where(xs < 0, -ret, ret)
         return ret

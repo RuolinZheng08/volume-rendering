@@ -12,18 +12,8 @@ class Convolution():
         self.pos_index = context.WtoI @ pos_world
         # the last entry of the len-4 vec is unused
         x_index, y_index, z_index, _ = self.pos_index.squeeze()
-        # cache intermediate computation
-        idx_start = context.idx_start
-        idx_end = context.idx_end
-        cache_length = idx_end - idx_start + 1
-
-        kern_cache_x = np.empty(cache_length)
-        kern_cache_y = np.empty(cache_length)
-        kern_deriv_cache_x = np.empty(cache_length)
-        kern_deriv_cache_y = np.empty(cache_length)
 
         kernel = context.kernel
-
         # compute convolution
         if kernel.support & 1: # odd support
             xn = np.floor(x_index + 0.5)
@@ -36,6 +26,21 @@ class Convolution():
         xalpha = x_index - xn
         yalpha = y_index - yn
         zalpha = z_index - zn
+
+        # points at which to evaluate the convolution
+        idx_start = context.idx_start
+        idx_end = context.idx_end
+        convo_vals = np.arange(idx_start, idx_end + 1)
+
+        kern_cache_x = kernel.apply(xalpha - convo_vals)
+        kern_cache_y = kernel.apply(yalpha - convo_vals)
+        kern_cache_z = kernel.apply(zalpha - convo_vals)
+        print(xalpha - convo_vals)
+        print(kern_cache_x, kern_cache_y, kern_cache_z, sep='\n\n')
+
+        kern_deriv_cache_x = kernel.apply_derivative(xalpha - convo_vals)
+        kern_deriv_cache_y = kernel.apply_derivative(yalpha - convo_vals)
+        kern_deriv_cache_z = kernel.apply_derivative(zalpha - convo_vals)
 
         convo_result = 0 # assign to self.value if convo is valid
         # column vector to accumulate gradient during convo
@@ -50,9 +55,9 @@ class Convolution():
             if not self.inside or vol_idx_z >= size_z:
                 self.inside = False
                 break
-            # compute convo result for current z
-            kern_res_z = kernel.evaluate(zalpha - zi)
-            kern_deriv_res_z = kernel.evaluate_derivative(zalpha - zi)
+            # look up convo result in cache
+            kern_res_z = kern_cache_z[zi - idx_start]
+            kern_deriv_res_z = kern_deriv_cache_z[zi - idx_start]
 
             # inner loop, faster axis
             for yi in range(idx_start, idx_end + 1):
@@ -60,10 +65,7 @@ class Convolution():
                 if not self.inside or vol_idx_y >= size_y:
                     self.inside = False
                     break
-                if zi == idx_start: # first iter, compute cache
-                    kern_cache_y[yi - idx_start] = kernel.evaluate(yalpha - yi)
-                    kern_deriv_cache_y[yi - idx_start] = \
-                    kernel.evaluate_derivative(yalpha - yi)
+                # look up convo result in cache
                 kern_res_y = kern_cache_y[yi - idx_start]
                 kern_deriv_res_y = kern_deriv_cache_y[yi - idx_start]
 
@@ -73,11 +75,7 @@ class Convolution():
                     if not self.inside or vol_idx_x >= size_x:
                         self.inside = False
                         break
-                    # first iter, compute cache
-                    if zi == idx_start and yi == idx_start:
-                        kern_cache_x[xi - idx_start] = kernel.evaluate(xalpha - xi)
-                        kern_deriv_cache_x[xi - idx_start] = \
-                        kernel.evaluate_derivative(xalpha - xi)
+                    # look up convo result in cache
                     kern_res_x = kern_cache_x[xi - idx_start]
                     kern_deriv_res_x = kern_deriv_cache_x[xi - idx_start]
 
