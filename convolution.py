@@ -1,23 +1,30 @@
 import numpy as np
 
 class Convolution():
-    def __init__(self):
-        """
-        needgrad always true b/c rndProbeRgbaLit
-        """
-        self.inside = True # set to False if convo cannot be evaluated
+
+    def evaluate(self, x_world, y_world, z_world, context):
+        # fill in these two outputs
         self.value = None
         self.gradient = None # world-space gradients
 
-    def evaluate(self, x_world, y_world, z_world, context):
         size_x, size_y, size_z = context.volume.data.shape
         pos_world = np.array([[x_world, y_world, z_world, 1]]).T # column vec
         self.pos_index = context.WtoI @ pos_world
         # the last entry of the len-4 vec is unused
         x_index, y_index, z_index, _ = self.pos_index.squeeze()
+        # cache intermediate computation
+        idx_start = context.idx_start
+        idx_end = context.idx_end
+        cache_length = idx_end - idx_start + 1
+
+        kern_cache_x = np.empty(cache_length)
+        kern_cache_y = np.empty(cache_length)
+        kern_deriv_cache_x = np.empty(cache_length)
+        kern_deriv_cache_y = np.empty(cache_length)
 
         kernel = context.kernel
-        # params for computing convolution
+
+        # compute convolution
         if kernel.support & 1: # odd support
             xn = np.floor(x_index + 0.5)
             yn = np.floor(y_index + 0.5)
@@ -30,19 +37,6 @@ class Convolution():
         yalpha = y_index - yn
         zalpha = z_index - zn
 
-        # points at which to evaluate the convolution
-        idx_start = context.idx_start
-        idx_end = context.idx_end
-        convo_vals = np.arange(idx_start, idx_end + 1)
-
-        kern_cache_x = kernel.apply(xalpha - convo_vals)
-        kern_cache_y = kernel.apply(yalpha - convo_vals)
-        kern_cache_z = kernel.apply(zalpha - convo_vals)
-
-        kern_deriv_cache_x = kernel.apply_derivative(xalpha - convo_vals)
-        kern_deriv_cache_y = kernel.apply_derivative(yalpha - convo_vals)
-        kern_deriv_cache_z = kernel.apply_derivative(zalpha - convo_vals)
-
         convo_result = 0 # assign to self.value if convo is valid
         # column vector to accumulate gradient during convo
         gradient_index = np.zeros((3, 1))
@@ -50,36 +44,44 @@ class Convolution():
         # the main convo loop
         # index into context.volume[vol_idx_x, vol_idx_y, vol_idx_z]
         # outermost loop, slow axis
+        self.inside = True # set to False if convo cannot be evaluated
         for zi in range(idx_start, idx_end + 1):
-            vol_idx_z = zn + zi
+            vol_idx_z = int(zn + zi)
             if not self.inside or vol_idx_z >= size_z:
                 self.inside = False
                 break
-            # look up convo result in cache
-            kern_res_z = kern_cache_z[zi - idx_start]
-            kern_deriv_res_z = kern_derive_cache_z[zi - idx_start]
+            # compute convo result for current z
+            kern_res_z = kernel.evaluate(zalpha - zi)
+            kern_deriv_res_z = kernel.evaluate_derivative(zalpha - zi)
 
             # inner loop, faster axis
             for yi in range(idx_start, idx_end + 1):
-                vol_idx_y = yn + yi
+                vol_idx_y = int(yn + yi)
                 if not self.inside or vol_idx_y >= size_y:
                     self.inside = False
                     break
-                # look up convo result in cache
+                if zi == idx_start: # first iter, compute cache
+                    kern_cache_y[yi - idx_start] = kernel.evaluate(yalpha - yi)
+                    kern_deriv_cache_y[yi - idx_start] = \
+                    kernel.evaluate_derivative(yalpha - yi)
                 kern_res_y = kern_cache_y[yi - idx_start]
-                kern_deriv_res_y = kern_derive_cache_y[yi - idx_start]
+                kern_deriv_res_y = kern_deriv_cache_y[yi - idx_start]
 
                 # innermost loop, fastest axis
                 for xi in range(idx_start, idx_end + 1):
-                    vol_idx_x = xn + xi
+                    vol_idx_x = int(xn + xi)
                     if not self.inside or vol_idx_x >= size_x:
                         self.inside = False
                         break
-                    # look up convo result in cache
+                    # first iter, compute cache
+                    if zi == idx_start and yi == idx_start:
+                        kern_cache_x[xi - idx_start] = kernel.evaluate(xalpha - xi)
+                        kern_deriv_cache_x[xi - idx_start] = \
+                        kernel.evaluate_derivative(xalpha - xi)
                     kern_res_x = kern_cache_x[xi - idx_start]
                     kern_deriv_res_x = kern_deriv_cache_x[xi - idx_start]
 
-                    val = context.volume[vol_idx_x, vol_idx_y, vol_idx_z]
+                    val = context.volume.data[vol_idx_x, vol_idx_y, vol_idx_z]
                     # accumulate convo result
                     convo_result += val * kern_res_x * kern_res_y * kern_res_z
                     # accumulate gradients

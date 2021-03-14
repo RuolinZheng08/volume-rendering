@@ -15,7 +15,7 @@ def unlerp(imin, xx, imax):
     """
     return (xx - imin) / (imax - imin)
 
-def lerp(omin, omax, alpha):
+def lerp3(omin, omax, alpha):
     """
     overloaded, either three or five arguments
     should work for both scalar and vector
@@ -23,7 +23,7 @@ def lerp(omin, omax, alpha):
     """
     return (1 - alpha) * omin + alpha * omax
 
-def lerp(omin, omax, imin, xx, imax):
+def lerp5(omin, omax, imin, xx, imax):
     alpha = (xx - imin) / (imax - imin)
     return (1 - alpha) * omin + alpha * omax
 
@@ -37,7 +37,7 @@ def quantize(vmin, val, vmax, num):
     # make sure quantized idx is below num
     if idx == num:
         idx -= 1
-    return idx
+    return int(idx)
 
 def construct_context(params_dict):
     """
@@ -108,8 +108,8 @@ def load_light(fpath_light):
             color, direction, is_view_space = re.split(r'\s{2,}', line.strip())
             rgb.append([float(s) for s in color.split()])
             xyz.append([float(s) for s in direction.split()])
-    light.rgb = np.hstack(rgb)
-    light.xyz = np.hstack(xyz)
+    light.rgb = np.vstack(rgb)
+    light.xyz = np.vstack(xyz)
     light.num = len(rgb)
     return light
 

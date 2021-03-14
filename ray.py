@@ -1,7 +1,7 @@
 import numpy as np
 
 # my modules
-from utils import unlerp, lerp, quantize
+from utils import unlerp, lerp3, lerp5, quantize
 
 class Ray():
     def start(self, idx_horizontal, idx_vertical, convolution, context):
@@ -26,9 +26,9 @@ class Ray():
         camera = context.camera
         ray_img = np.empty((4, 1))
         ray_img[0] = (camera.img_plane_width / 2) * \
-        lerp(-1, 1, -0.5, idx_horizontal, camera.img_plane_size[0] - 0.5)
+        lerp5(-1, 1, -0.5, idx_horizontal, camera.img_plane_size[0] - 0.5)
         ray_img[1] = (camera.img_plane_height / 2) * \
-        lerp(1, -1, -0.5, idx_vertical, camera.img_plane_size[1] - 0.5)
+        lerp5(1, -1, -0.5, idx_vertical, camera.img_plane_size[1] - 0.5)
         ray_img[2] = -camera.dist
         ray_img[3] = np.nan
 
@@ -41,7 +41,8 @@ class Ray():
             self.pos_view_init = scale * ray_img
             scale = context.plane_sep / camera.dist
             self.step_view = scale * ray_img
-        self.step_view_len = np.linalg.norm(self.step_view)
+        # use only the first three entries for norm since the last is artificially NaN
+        self.step_view_len = np.linalg.norm(self.step_view[:3])
 
         # manually set last entry to 1
         self.pos_view_init[3] = 1
@@ -95,29 +96,29 @@ class Ray():
         # no need to do Blinn-Phong if corrected opacity is 0
         # since color won't change
         if corrected == 0:
-            rgb_lit = rgba
+            rgb_lit = rgba[:3] # no need to use opacity
         else:
             if camera.ortho: # viewer direction is context.camera.n
                 viewer_dir = camera.n
             else: # perspective
                 pos_world_dir = self.pos_world_init - pos_world
-                pos_world_dir /= np.linalg(pos_world_dir) # normalize
+                pos_world_dir /= np.linalg.norm(pos_world_dir) # normalize
                 viewer_dir = pos_world_dir
             rgb_lit = self.blinn_phong(rgba[:3], convolution.gradient,
             viewer_dir, context)
 
         # depth cueing
-        gamma = lerp(0, 1, camera.near_clip_view, -pos_view[0, 2], camera.far_clip_view)
+        gamma = lerp5(0, 1, camera.near_clip_view, -pos_view[2, 0], camera.far_clip_view)
         dcn = context.params_light.depth_color_near
         dcf = context.params_light.depth_color_far
-        color_lerped = lerp(dcn, dcf, gamma)
+        color_lerped = lerp3(dcn, dcf, gamma)
         # multiply component-wise 3-vec of rgb and copy opacity over
-        self.result_curr = np.append(rgb_lit * color_lerped, rgba[3])
+        self.result_curr = np.append(rgb_lit * color_lerped.squeeze(), rgba[3])
 
-        keepgoing = self.blend()
+        keepgoing = self.blend(context)
         return keepgoing
 
-    def blend(self):
+    def blend(self, context):
         """
         rndBlendOver
         returns a boolean, keepgoing
@@ -162,9 +163,9 @@ class Ray():
             return rgb_out # done
 
         # surface normal N = -g/|g|
-        normal = -gradient / gradient_len
+        normal = -gradient.squeeze() / gradient_len # row vector
         for i in range(light.num):
-            light_col = light.rgb[i]
+            light_col = light.rgb[i] # row vector
             light_dir = light.xyz[i]
             # compute diffuse
             # component-wise c_M * c_L
@@ -174,9 +175,9 @@ class Ray():
 
             # compute specular
             # halfway between V and L
-            halfway = (viewer_dir + light_dir)
+            halfway = (viewer_dir.squeeze()[:3] + light_dir)
             halfway /= np.linalg.norm(halfway) # normalize
-            scale = pow(max(0, np.dot(normal, halfway), params_light.p_shininess))
+            scale = pow(max(0, np.dot(normal, halfway)), params_light.p_shininess)
             specular = params_light.k_specular * scale * light_col
 
             rgb_out += diffuse + specular

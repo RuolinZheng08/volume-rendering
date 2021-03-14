@@ -11,4 +11,5 @@
 -lut lut.nrrd -lit rgb.txt -o cube-rgb.nrrd
 
 overrgb -i cube-rgb.nrrd -b 0 0 0 -o cube-rgb.png
+overrgb -i cube-rgb-py.nrrd -b 0 0 0 -o cube-rgb-py.png
 ```
