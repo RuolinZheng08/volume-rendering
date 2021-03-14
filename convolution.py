@@ -35,8 +35,6 @@ class Convolution():
         kern_cache_x = kernel.apply(xalpha - convo_vals)
         kern_cache_y = kernel.apply(yalpha - convo_vals)
         kern_cache_z = kernel.apply(zalpha - convo_vals)
-        print(xalpha - convo_vals)
-        print(kern_cache_x, kern_cache_y, kern_cache_z, sep='\n\n')
 
         kern_deriv_cache_x = kernel.apply_derivative(xalpha - convo_vals)
         kern_deriv_cache_y = kernel.apply_derivative(yalpha - convo_vals)
