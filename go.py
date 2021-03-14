@@ -38,7 +38,7 @@ def parse_args(args):
     params_dict['params_camera']['up'] = np.array([[0, 0, 1]]).T
     params_dict['params_camera']['near_clip'] = -2.3
     params_dict['params_camera']['far_clip'] = 2.3
-    params_dict['params_camera']['field_of_view'] = 20
+    params_dict['params_camera']['field_of_view'] = 14
     params_dict['params_camera']['img_plane_size'] = (320, 280)
     params_dict['params_camera']['ortho'] = False
 
