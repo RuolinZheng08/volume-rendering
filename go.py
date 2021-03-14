@@ -19,8 +19,8 @@ def main():
     if not context.num_threads: # 0 or unspecified
         ray = Ray()
         convolution = Convolution()
-        for col in tqdm(range(num_cols)):
-            for row in range(num_rows):
+        for col in tqdm(range(num_cols), position=0):
+            for row in tqdm(range(num_rows), position=1, leave=False):
                 result = ray.go(row, col, convolution, context)
                 img_out[:, row, col] = result
     else: # multithread
