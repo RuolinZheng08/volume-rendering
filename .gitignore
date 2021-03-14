@@ -1,4 +1,5 @@
 .DS_Store
+*.nrrd
 *.png
 # gitignore template for Jupyter Notebooks
 # website: http://jupyter.org/

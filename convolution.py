@@ -1,3 +1,4 @@
+import math
 import numpy as np
 
 class Convolution():
@@ -16,13 +17,13 @@ class Convolution():
         kernel = context.kernel
         # compute convolution
         if kernel.support & 1: # odd support
-            xn = np.floor(x_index + 0.5)
-            yn = np.floor(y_index + 0.5)
-            zn = np.floor(z_index + 0.5)
+            xn = math.floor(x_index + 0.5)
+            yn = math.floor(y_index + 0.5)
+            zn = math.floor(z_index + 0.5)
         else:
-            xn = np.floor(x_index)
-            yn = np.floor(y_index)
-            zn = np.floor(z_index)
+            xn = math.floor(x_index)
+            yn = math.floor(y_index)
+            zn = math.floor(z_index)
         xalpha = x_index - xn
         yalpha = y_index - yn
         zalpha = z_index - zn
@@ -49,8 +50,8 @@ class Convolution():
         # outermost loop, slow axis
         self.inside = True # set to False if convo cannot be evaluated
         for zi in range(idx_start, idx_end + 1):
-            vol_idx_z = int(zn + zi)
-            if not self.inside or vol_idx_z >= size_z:
+            vol_idx_z = zn + zi
+            if not self.inside or not 0 <= vol_idx_z < size_z:
                 self.inside = False
                 break
             # look up convo result in cache
@@ -59,8 +60,8 @@ class Convolution():
 
             # inner loop, faster axis
             for yi in range(idx_start, idx_end + 1):
-                vol_idx_y = int(yn + yi)
-                if not self.inside or vol_idx_y >= size_y:
+                vol_idx_y = yn + yi
+                if not self.inside or not 0 <= vol_idx_y < size_y:
                     self.inside = False
                     break
                 # look up convo result in cache
@@ -69,14 +70,15 @@ class Convolution():
 
                 # innermost loop, fastest axis
                 for xi in range(idx_start, idx_end + 1):
-                    vol_idx_x = int(xn + xi)
-                    if not self.inside or vol_idx_x >= size_x:
+                    vol_idx_x = xn + xi
+                    if not self.inside or not 0 <= vol_idx_x < size_x:
                         self.inside = False
                         break
                     # look up convo result in cache
                     kern_res_x = kern_cache_x[xi - idx_start]
                     kern_deriv_res_x = kern_deriv_cache_x[xi - idx_start]
 
+                    # compute convolution
                     val = context.volume.data[vol_idx_x, vol_idx_y, vol_idx_z]
                     # accumulate convo result
                     convo_result += val * kern_res_x * kern_res_y * kern_res_z
